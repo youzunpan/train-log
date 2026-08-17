@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="訓練記錄">
+<meta name="theme-color" content="#0e1013">
+<title>訓練記錄</title>
+<style>
+:root{
+  --bg:#0e1013; --card:#181c22; --card2:#1f242c; --line:#2a3038;
+  --fg:#e8eaed; --dim:#8a919b; --accent:#4ade80; --accent-dim:#173325;
+  --amber:#fbbf24; --red:#f87171; --blue:#60a5fa;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{background:var(--bg);color:var(--fg);
+  font-family:-apple-system,BlinkMacSystemFont,"PingFang TC","Noto Sans TC",sans-serif;
+  font-size:16px;overscroll-behavior-y:none}
+body{touch-action:manipulation;-webkit-user-select:none;user-select:none}
+.num{font-variant-numeric:tabular-nums}
+
+/* ── 頂部分頁 ── */
+#tabs{position:fixed;top:0;left:0;right:0;z-index:10;display:flex;
+  background:rgba(14,16,19,.92);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
+  border-bottom:1px solid var(--line);
+  padding-top:env(safe-area-inset-top)}
+#tabs button{flex:1;min-height:48px;background:none;border:none;color:var(--dim);
+  font-size:16px;font-weight:600;border-bottom:2.5px solid transparent}
+#tabs button.on{color:var(--fg);border-bottom-color:var(--accent)}
+
+main{display:none;padding:calc(58px + env(safe-area-inset-top)) 12px calc(96px + env(safe-area-inset-bottom))}
+main.on{display:block}
+
+/* ── 動作選擇 ── */
+#exGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+#exGrid button{min-height:48px;background:var(--card);border:1px solid var(--line);
+  border-radius:12px;color:var(--fg);font-size:15px;font-weight:500;padding:4px 2px}
+#exGrid button.sel{background:var(--accent-dim);border-color:var(--accent);color:var(--accent);font-weight:700}
+#customRow{display:flex;gap:8px;margin-top:8px}
+#customRow input{flex:1;min-height:48px;background:var(--card);border:1px solid var(--line);
+  border-radius:12px;color:var(--fg);font-size:16px;padding:0 12px;-webkit-user-select:text;user-select:text}
+#customRow button{min-width:72px;min-height:48px;background:var(--card2);border:1px solid var(--line);
+  border-radius:12px;color:var(--fg);font-size:15px;font-weight:600}
+
+/* ── 上次成績 ── */
+#lastBox{margin-top:12px;padding:12px 14px;background:var(--card);border-radius:12px;
+  border:1px solid var(--line);font-size:15px;color:var(--dim);line-height:1.5;display:none}
+#lastBox.show{display:block}
+#lastBox .beat{color:var(--accent);font-weight:700}
+#lastBox .pr{color:var(--amber);font-weight:700}
+
+/* ── 調整區 ── */
+.stepper{margin-top:12px;display:flex;align-items:stretch;gap:8px}
+.stepper button{flex:1;min-height:60px;background:var(--card2);border:1px solid var(--line);
+  border-radius:14px;color:var(--fg);font-size:20px;font-weight:700}
+.stepper button:active{background:var(--line)}
+.stepper .val{flex:1.4;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  background:var(--card);border-radius:14px;border:1px solid var(--line)}
+.stepper .val b{font-size:30px;font-weight:800;line-height:1.1}
+.stepper .val span{font-size:12px;color:var(--dim)}
+
+#addBtn{margin-top:12px;width:100%;min-height:64px;border:none;border-radius:16px;
+  background:var(--accent);color:#08210f;font-size:20px;font-weight:800}
+#addBtn:disabled{background:var(--card2);color:var(--dim)}
+#addBtn:active:not(:disabled){filter:brightness(1.15)}
+
+#undoRow{display:flex;gap:8px;margin-top:10px}
+#undoRow button{flex:1;min-height:48px;background:none;border:1px solid var(--line);
+  border-radius:12px;color:var(--dim);font-size:15px;font-weight:600}
+#undoRow #undoBtn{color:var(--red);border-color:#4a2a2a}
+
+/* ── 今日清單 ── */
+#todayList{margin-top:18px}
+#todayList h3{font-size:13px;color:var(--dim);font-weight:600;margin-bottom:8px;letter-spacing:.05em}
+.blk{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 14px;margin-bottom:8px}
+.blk .hd{display:flex;justify-content:space-between;align-items:baseline;font-weight:700;font-size:16px}
+.blk .hd .vol{font-size:13px;color:var(--dim);font-weight:500}
+.blk .hd .prtag{color:var(--amber);font-size:12px;font-weight:800;margin-left:6px}
+.blk .rows{margin-top:4px;color:var(--dim);font-size:15px;line-height:1.7}
+.blk .rows b{color:var(--fg);font-weight:600}
+
+/* ── 底部固定列 ── */
+#foot{position:fixed;left:0;right:0;bottom:0;z-index:10;
+  background:rgba(20,24,29,.95);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
+  border-top:1px solid var(--line);
+  padding:10px 14px calc(10px + env(safe-area-inset-bottom));
+  display:flex;align-items:center;justify-content:space-between;gap:10px}
+#foot .stats{font-size:14px;color:var(--dim);line-height:1.4}
+#foot .stats b{color:var(--fg);font-size:17px;font-weight:800}
+#timerBtn{min-width:104px;min-height:52px;border-radius:14px;border:1px solid var(--line);
+  background:var(--card2);color:var(--fg);font-size:20px;font-weight:700}
+#timerBtn.paused{color:var(--dim)}
+#timerBtn.hot{border-color:var(--accent);color:var(--accent)}
+
+/* ── 匯出頁 ── */
+#exportText{width:100%;background:var(--card);border:1px solid var(--line);border-radius:12px;
+  color:var(--fg);font-size:14px;line-height:1.8;padding:14px;white-space:pre-wrap;
+  font-family:ui-monospace,Menlo,monospace;-webkit-user-select:text;user-select:text}
+.bigbtn{margin-top:12px;width:100%;min-height:56px;border:none;border-radius:14px;
+  background:var(--blue);color:#071626;font-size:18px;font-weight:800}
+.subbtns{display:flex;gap:8px;margin-top:10px}
+.subbtns button,.subbtns label{flex:1;min-height:48px;display:flex;align-items:center;justify-content:center;
+  background:var(--card2);border:1px solid var(--line);border-radius:12px;color:var(--dim);
+  font-size:14px;font-weight:600}
+.subbtns input{display:none}
+
+/* ── 歷史頁 ── */
+.day{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:10px}
+.day .hd{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px}
+.day .hd .d{font-weight:800;font-size:16px}
+.day .hd .v{color:var(--accent);font-weight:700;font-size:14px}
+.day .ln{font-size:14px;color:var(--dim);line-height:1.8}
+.day .ln b{color:var(--fg);font-weight:600}
+.empty{color:var(--dim);text-align:center;padding:40px 0;font-size:15px}
+#toast{position:fixed;left:50%;bottom:calc(110px + env(safe-area-inset-bottom));transform:translateX(-50%);
+  background:var(--accent);color:#08210f;font-weight:700;padding:10px 20px;border-radius:99px;
+  font-size:15px;opacity:0;pointer-events:none;transition:opacity .25s;z-index:20}
+#toast.show{opacity:1}
+</style>
+</head>
+<body>
+
+<nav id="tabs">
+  <button class="on" data-page="log">記錄</button>
+  <button data-page="export">匯出</button>
+  <button data-page="history">歷史</button>
+</nav>
+
+<main id="page-log" class="on">
+  <div id="exGrid"></div>
+  <div id="customRow">
+    <input id="customInput" type="text" placeholder="自訂動作…" enterkeyhint="done">
+    <button id="customAdd">新增</button>
+  </div>
+
+  <div id="lastBox"></div>
+
+  <div class="stepper" id="wStep">
+    <button data-d="-5">−5</button>
+    <button data-d="-1">−1</button>
+    <div class="val"><b id="wVal" class="num">50</b><span>公斤</span></div>
+    <button data-d="1">＋1</button>
+    <button data-d="5">＋5</button>
+  </div>
+  <div class="stepper" id="rStep">
+    <button data-d="-1">−1</button>
+    <div class="val"><b id="rVal" class="num">10</b><span>次</span></div>
+    <button data-d="1">＋1</button>
+  </div>
+
+  <button id="addBtn" disabled>加入這一組</button>
+  <div id="undoRow">
+    <button id="undoBtn">復原上一組</button>
+  </div>
+
+  <div id="todayList"></div>
+</main>
+
+<main id="page-export">
+  <div id="exportText" class="num"></div>
+  <button id="copyBtn" class="bigbtn">一鍵複製</button>
+  <div class="subbtns">
+    <button id="jsonExport">匯出 JSON 備份</button>
+    <label>匯入 JSON<input id="jsonImport" type="file" accept=".json,application/json"></label>
+  </div>
+  <div class="subbtns">
+    <button id="clearDay" style="color:var(--red)">清除今日記錄</button>
+  </div>
+</main>
+
+<main id="page-history"><div id="histList"></div></main>
+
+<footer id="foot">
+  <div class="stats num" id="footStats"></div>
+  <button id="timerBtn" class="num">0:00</button>
+</footer>
+
+<div id="toast"></div>
+
+<script>
+'use strict';
+const KEY='trainlog-v1', CKEY='trainlog-custom-v1';
+const DEFAULT_EX=['背下拉','划船','後三角背','滑輪下拉','胸推','夾胸','肩推','側平舉',
+  '腿推','股四頭','股二頭','小腿','臀內收','臀外展','臀推','二頭彎舉','三頭下壓','核心'];
+const $=id=>document.getElementById(id);
+const fmt=n=>Math.round(n).toLocaleString('en-US');
+
+/* ── 資料 ── */
+function seed(){
+  const S=(ex,segs)=>segs.flatMap(([w,reps])=>reps.map(r=>({ex,w,r})));
+  return {
+    '2026-08-14':[
+      ...S('背下拉',[[98,[5,5,5]]]),
+      ...S('划船',[[88,[9]],[79,[9,9]]]),
+      ...S('臀內收',[[73,[10,9,9]]]),
+      ...S('臀外展',[[68,[8,8,7]]]),
+      ...S('股四頭',[[68,[10]],[77,[9,8]]]),
+      ...S('股二頭',[[68,[7,7,6]]]),
+      ...S('夾胸',[[73,[9,8,7]]]),
+    ],
+    '2026-08-17':[
+      ...S('背下拉',[[88,[9,9,7]]]),
+      ...S('腿推',[[136,[12,12,12,12]]]),
+      ...S('臀內收',[[73,[12,11,9]]]),
+      ...S('臀外展',[[68,[10,9,7]]]),
+      ...S('夾胸',[[73,[10,8,7]]]),
+      ...S('後三角背',[[59,[9,8,7]]]),
+      ...S('胸推',[[88,[12,12]],[98,[12]]]),
+    ],
+  };
+}
+let db;
+try{ db=JSON.parse(localStorage.getItem(KEY)); }catch(e){ db=null; }
+if(!db||typeof db!=='object'||Array.isArray(db)){ db=seed(); persist(); }
+let customEx;
+try{ customEx=JSON.parse(localStorage.getItem(CKEY))||[]; }catch(e){ customEx=[]; }
+function persist(){ localStorage.setItem(KEY,JSON.stringify(db)); }
+
+function todayStr(){
+  const d=new Date(), p=n=>String(n).padStart(2,'0');
+  return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate());
+}
+const todaySets=()=>db[todayStr()]||[];
+
+/* ── 統計工具 ── */
+const vol=sets=>sets.reduce((s,x)=>s+x.w*x.r,0);
+const exSets=(sets,ex)=>sets.filter(s=>s.ex===ex);
+
+// 依「連續同重量」切段：[{w, reps:[...]}]
+function weightSegs(sets){
+  const segs=[];
+  for(const s of sets){
+    const last=segs[segs.length-1];
+    if(last&&last.w===s.w) last.reps.push(s.r);
+    else segs.push({w:s.w,reps:[s.r]});
+  }
+  return segs;
+}
+const segText=segs=>segs.map(g=>g.w+' '+g.reps.join('/')).join('，');
+const segTextKg=segs=>segs.map(g=>g.w+'kg '+g.reps.join('/')).join('，');
+
+// 上一次做某動作（不含今天）：{date, sets} 或 null
+function lastSession(ex){
+  const dates=Object.keys(db).filter(d=>d!==todayStr()).sort().reverse();
+  for(const d of dates){
+    const s=exSets(db[d],ex);
+    if(s.length) return {date:d,sets:s};
+  }
+  return null;
+}
+// 某動作在今天之前的最大單組重量（PR 判定用）
+function histMaxW(ex){
+  let m=0;
+  for(const d of Object.keys(db)){
+    if(d>=todayStr()) continue;
+    for(const s of db[d]) if(s.ex===ex&&s.w>m) m=s.w;
+  }
+  return m;
+}
+
+/* ── 狀態 ── */
+let curEx=null, curW=50, curR=10;
+
+/* ── 動作選擇 ── */
+function renderGrid(){
+  const g=$('exGrid'); g.innerHTML='';
+  for(const ex of [...DEFAULT_EX,...customEx]){
+    const b=document.createElement('button');
+    b.textContent=ex;
+    if(ex===curEx) b.classList.add('sel');
+    b.onclick=()=>selectEx(ex);
+    g.appendChild(b);
+  }
+}
+function selectEx(ex){
+  curEx=ex;
+  // 預填：今天做過→接續今天最後一組；否則→上次第一組
+  const today=exSets(todaySets(),ex);
+  if(today.length){ curW=today[today.length-1].w; curR=today[today.length-1].r; }
+  else{
+    const last=lastSession(ex);
+    if(last){ curW=last.sets[0].w; curR=last.sets[0].r; }
+  }
+  renderGrid(); renderControls(); renderLastBox();
+}
+$('customAdd').onclick=()=>{
+  const v=$('customInput').value.trim();
+  if(!v) return;
+  if(![...DEFAULT_EX,...customEx].includes(v)){
+    customEx.push(v);
+    localStorage.setItem(CKEY,JSON.stringify(customEx));
+  }
+  $('customInput').value=''; $('customInput').blur();
+  selectEx(v);
+};
+$('customInput').addEventListener('keydown',e=>{ if(e.key==='Enter') $('customAdd').onclick(); });
+
+/* ── 調整與加入 ── */
+function renderControls(){
+  $('wVal').textContent=curW;
+  $('rVal').textContent=curR;
+  $('addBtn').disabled=!curEx;
+  $('addBtn').textContent=curEx?('加入這一組　'+curEx+' '+curW+'kg × '+curR):'先選一個動作';
+}
+$('wStep').addEventListener('click',e=>{
+  const d=e.target.dataset.d; if(!d) return;
+  curW=Math.max(0,curW+ +d); renderControls();
+});
+$('rStep').addEventListener('click',e=>{
+  const d=e.target.dataset.d; if(!d) return;
+  curR=Math.max(1,curR+ +d); renderControls();
+});
+$('addBtn').onclick=()=>{
+  if(!curEx) return;
+  const t=todayStr();
+  if(!db[t]) db[t]=[];
+  db[t].push({ex:curEx,w:curW,r:curR});
+  persist(); startTimer(); renderAll();
+  toast('已記錄　'+curEx+' '+curW+'kg × '+curR);
+};
+$('undoBtn').onclick=()=>{
+  const t=todayStr(), sets=db[t];
+  if(!sets||!sets.length) return;
+  const rm=sets.pop();
+  if(!sets.length) delete db[t];
+  persist(); renderAll();
+  toast('已刪除　'+rm.ex+' '+rm.w+'kg × '+rm.r);
+};
+$('clearDay').onclick=()=>{
+  if(!todaySets().length){ toast('今天沒有記錄'); return; }
+  if(confirm('確定清除今日全部記錄？此動作無法復原。')){
+    delete db[todayStr()]; persist(); renderAll(); toast('已清除今日記錄');
+  }
+};
+
+/* ── 上次成績 ── */
+function renderLastBox(){
+  const box=$('lastBox');
+  if(!curEx){ box.classList.remove('show'); return; }
+  const last=lastSession(curEx);
+  const tSets=exSets(todaySets(),curEx);
+  const tVol=vol(tSets);
+  let html='';
+  if(last){
+    const lVol=vol(last.sets);
+    html='上次 '+last.date.slice(5)+'　'+segTextKg(weightSegs(last.sets))
+        +'　共 '+fmt(lVol)+' kg';
+    if(tSets.length){
+      html+='<br>本次已累積 '+fmt(tVol)+' kg';
+      if(tVol>lVol) html+='　<span class="beat">✓ 已超越</span>';
+    }
+  }else{
+    html='「'+curEx+'」第一次記錄，加油！';
+    if(tSets.length) html+='<br>本次已累積 '+fmt(tVol)+' kg';
+  }
+  box.innerHTML=html;
+  box.classList.add('show');
+}
+
+/* ── 今日清單（連續同動作同重量合併為一區塊） ── */
+function renderToday(){
+  const list=$('todayList'), sets=todaySets();
+  if(!sets.length){ list.innerHTML=''; return; }
+  // 連續同動作＋同重量 → 一個區塊
+  const blocks=[];
+  for(const s of sets){
+    const last=blocks[blocks.length-1];
+    if(last&&last.ex===s.ex&&last.w===s.w) last.reps.push(s.r);
+    else blocks.push({ex:s.ex,w:s.w,reps:[s.r]});
+  }
+  let html='<h3>今日已記錄</h3>';
+  for(let i=blocks.length-1;i>=0;i--){ // 最新在上
+    const b=blocks[i];
+    const bVol=b.w*b.reps.reduce((a,c)=>a+c,0);
+    const pr=histMaxW(b.ex)>0&&b.w>histMaxW(b.ex)?'<span class="prtag">PR</span>':'';
+    html+='<div class="blk"><div class="hd"><span>'+b.ex+'　<span class="num">'+b.w+'kg</span>'+pr
+        +'</span><span class="vol num">'+fmt(bVol)+' kg</span></div><div class="rows num">'
+        +b.reps.map((r,j)=>'第 '+(j+1)+' 組　<b>'+r+' 次</b>').join('<br>')
+        +'</div></div>';
+  }
+  list.innerHTML=html;
+}
+
+/* ── 底部統計 ── */
+function renderFoot(){
+  const sets=todaySets();
+  const exN=new Set(sets.map(s=>s.ex)).size;
+  $('footStats').innerHTML='今日 <b>'+fmt(vol(sets))+'</b> kg<br>'
+    +exN+' 動作 · '+sets.length+' 組';
+}
+
+/* ── 計時器 ── */
+let tm={on:false,elapsed:0,mark:0};
+function startTimer(){ tm={on:true,elapsed:0,mark:Date.now()}; tickTimer(); }
+$('timerBtn').onclick=()=>{
+  if(tm.on){ tm.elapsed+=Date.now()-tm.mark; tm.on=false; }
+  else{ tm.mark=Date.now(); tm.on=true; }
+  tickTimer();
+};
+function tickTimer(){
+  const ms=tm.elapsed+(tm.on?Date.now()-tm.mark:0);
+  const s=Math.floor(ms/1000);
+  $('timerBtn').textContent=Math.floor(s/60)+':'+String(s%60).padStart(2,'0');
+  $('timerBtn').className='num '+(tm.on?(s>=90?'hot':''):'paused');
+}
+setInterval(tickTimer,500);
+
+/* ── 匯出文字 ── */
+function exportLines(date,sets){
+  // 一動作一行（依首次出現順序），同動作依連續重量切段
+  const order=[];
+  for(const s of sets) if(!order.includes(s.ex)) order.push(s.ex);
+  return order.map(ex=>{
+    const es=exSets(sets,ex);
+    return ex+'　'+segText(weightSegs(es))+'　（'+fmt(vol(es))+' kg）';
+  });
+}
+function buildExport(){
+  const t=todayStr(), sets=todaySets();
+  if(!sets.length) return t+' 訓練記錄\n\n（今天還沒有記錄）';
+  return t+' 訓練記錄\n\n'+exportLines(t,sets).join('\n')
+    +'\n\n總訓練量 '+fmt(vol(sets))+' kg';
+}
+$('copyBtn').onclick=async()=>{
+  const txt=buildExport();
+  try{ await navigator.clipboard.writeText(txt); toast('已複製'); }
+  catch(e){
+    const ta=document.createElement('textarea');
+    ta.value=txt; document.body.appendChild(ta);
+    ta.select(); document.execCommand('copy'); ta.remove();
+    toast('已複製');
+  }
+};
+
+/* ── JSON 備份 ── */
+$('jsonExport').onclick=()=>{
+  const blob=new Blob([JSON.stringify(db,null,1)],{type:'application/json'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='訓練記錄-backup-'+todayStr()+'.json';
+  a.click(); URL.revokeObjectURL(a.href);
+};
+$('jsonImport').addEventListener('change',e=>{
+  const f=e.target.files[0]; if(!f) return;
+  const rd=new FileReader();
+  rd.onload=()=>{
+    try{
+      const obj=JSON.parse(rd.result);
+      if(typeof obj!=='object'||Array.isArray(obj)) throw 0;
+      for(const k of Object.keys(obj))
+        if(!/^\d{4}-\d{2}-\d{2}$/.test(k)||!Array.isArray(obj[k])) throw 0;
+      if(confirm('匯入將覆蓋現有全部記錄，確定？')){
+        db=obj; persist(); renderAll(); toast('已匯入');
+      }
+    }catch(err){ toast('檔案格式不正確'); }
+    e.target.value='';
+  };
+  rd.readAsText(f);
+});
+
+/* ── 歷史 ── */
+function renderHistory(){
+  const el=$('histList');
+  const cutoff=new Date(Date.now()-30*864e5);
+  const dates=Object.keys(db).sort().reverse()
+    .filter(d=>new Date(d+'T00:00:00')>=cutoff);
+  if(!dates.length){ el.innerHTML='<div class="empty">過去 30 天沒有記錄</div>'; return; }
+  el.innerHTML=dates.map(d=>{
+    const sets=db[d];
+    const lines=exportLines(d,sets).map(l=>{
+      const i=l.indexOf('　');
+      return '<div class="ln num"><b>'+l.slice(0,i)+'</b>'+l.slice(i)+'</div>';
+    }).join('');
+    return '<div class="day"><div class="hd"><span class="d num">'+d
+      +(d===todayStr()?'（今天）':'')+'</span><span class="v num">'
+      +fmt(vol(sets))+' kg</span></div>'+lines+'</div>';
+  }).join('');
+}
+
+/* ── 分頁切換 ── */
+$('tabs').addEventListener('click',e=>{
+  const p=e.target.dataset.page; if(!p) return;
+  document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('on',b===e.target));
+  document.querySelectorAll('main').forEach(m=>m.classList.toggle('on',m.id==='page-'+p));
+  if(p==='export') $('exportText').textContent=buildExport();
+  if(p==='history') renderHistory();
+  window.scrollTo(0,0);
+});
+
+/* ── Toast ── */
+let toastTm;
+function toast(msg){
+  const t=$('toast'); t.textContent=msg; t.classList.add('show');
+  clearTimeout(toastTm);
+  toastTm=setTimeout(()=>t.classList.remove('show'),1600);
+}
+
+function renderAll(){
+  renderGrid(); renderControls(); renderLastBox(); renderToday(); renderFoot();
+  if($('page-export').classList.contains('on')) $('exportText').textContent=buildExport();
+  if($('page-history').classList.contains('on')) renderHistory();
+}
+renderAll();
+</script>
+</body>
+</html>
