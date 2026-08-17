@@ -106,10 +106,15 @@ main.on{display:block}
   display:flex;align-items:center;justify-content:space-between;gap:10px}
 #foot .stats{font-size:14px;color:var(--dim);line-height:1.4}
 #foot .stats b{color:var(--fg);font-size:17px;font-weight:800}
-#timerBtn{min-width:104px;min-height:52px;border-radius:14px;border:1px solid var(--line);
-  background:var(--card2);color:var(--fg);font-size:20px;font-weight:700}
-#timerBtn.paused{color:var(--dim)}
-#timerBtn.hot{border-color:var(--accent);color:var(--accent)}
+#timerBtn{min-width:118px;min-height:56px;border-radius:14px;border:1px solid var(--line);
+  background:var(--card2);color:var(--dim);font-size:11px;font-weight:600;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  line-height:1.25;padding:4px 10px}
+#timerBtn b{font-size:20px;font-weight:800;color:var(--fg);font-variant-numeric:tabular-nums}
+#timerBtn.done{background:var(--accent);border-color:var(--accent);color:#08210f;
+  animation:pulse 1s ease-in-out infinite}
+#timerBtn.done b{color:#08210f;font-size:15px}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
 
 /* ── 匯出頁 ── */
 #exportText{width:100%;background:var(--card);border:1px solid var(--line);border-radius:12px;
@@ -436,21 +441,66 @@ function renderFoot(){
     +exN+' 動作 · '+sets.length+' 組';
 }
 
-/* ── 計時器 ── */
-let tm={on:false,elapsed:0,mark:0};
-function startTimer(){ tm={on:true,elapsed:0,mark:Date.now()}; tickTimer(); }
-$('timerBtn').onclick=()=>{
-  if(tm.on){ tm.elapsed+=Date.now()-tm.mark; tm.on=false; }
-  else{ tm.mark=Date.now(); tm.on=true; }
+/* ── 組間休息倒數計時器 ── */
+const RKEY='trainlog-rest-v1';
+const REST_PRESETS=[60,90,120,150,180];
+let restSec=parseInt(localStorage.getItem(RKEY),10);
+if(!REST_PRESETS.includes(restSec)) restSec=90;
+let tm=null;        // {start} 倒數起點;null = 尚未開始
+let beeped=false;
+let audioCtx=null;
+function ensureAudio(){  // 需在使用者手勢中建立,iOS 才允許發聲
+  try{
+    audioCtx=audioCtx||new (window.AudioContext||window.webkitAudioContext)();
+    if(audioCtx.resume) audioCtx.resume();
+  }catch(e){}
+}
+function beep(){
+  if(!audioCtx) return;
+  try{
+    const t0=audioCtx.currentTime;
+    [0,0.28].forEach(off=>{
+      const o=audioCtx.createOscillator(),g=audioCtx.createGain();
+      o.frequency.value=880;o.connect(g);g.connect(audioCtx.destination);
+      g.gain.setValueAtTime(0.001,t0+off);
+      g.gain.exponentialRampToValueAtTime(0.35,t0+off+0.02);
+      g.gain.exponentialRampToValueAtTime(0.001,t0+off+0.2);
+      o.start(t0+off);o.stop(t0+off+0.22);
+    });
+  }catch(e){}
+}
+function startTimer(){ ensureAudio(); tm={start:Date.now()}; beeped=false; tickTimer(); }
+$('timerBtn').onclick=()=>{   // 點計時器 = 切換休息秒數
+  ensureAudio();
+  restSec=REST_PRESETS[(REST_PRESETS.indexOf(restSec)+1)%REST_PRESETS.length];
+  localStorage.setItem(RKEY,restSec);
+  toast('組間休息:'+restSec+' 秒');
   tickTimer();
 };
 function tickTimer(){
-  const ms=tm.elapsed+(tm.on?Date.now()-tm.mark:0);
-  const s=Math.floor(ms/1000);
-  $('timerBtn').textContent=Math.floor(s/60)+':'+String(s%60).padStart(2,'0');
-  $('timerBtn').className='num '+(tm.on?(s>=90?'hot':''):'paused');
+  const btn=$('timerBtn');
+  if(!tm){
+    btn.className=''; btn.style.background='';
+    btn.innerHTML='<span>組間休息</span><b>'+restSec+' 秒</b>';
+    return;
+  }
+  const remain=Math.ceil((tm.start+restSec*1000-Date.now())/1000);
+  if(remain<=0){
+    if(!beeped){
+      beeped=true; beep();
+      try{ if(navigator.vibrate) navigator.vibrate([200,100,200]); }catch(e){}
+    }
+    btn.className='done'; btn.style.background='';
+    btn.innerHTML='<span>休息結束</span><b>開始下一組！</b>';
+  }else{
+    const pct=100*(1-remain/restSec);
+    btn.className='';
+    btn.style.background='linear-gradient(to right, rgba(74,222,128,.22) '+pct+'%, var(--card2) '+pct+'%)';
+    btn.innerHTML='<span>休息中</span><b>'+Math.floor(remain/60)+':'+String(remain%60).padStart(2,'0')+'</b>';
+  }
 }
 setInterval(tickTimer,500);
+tickTimer();
 
 /* ── 匯出文字 ── */
 function exportLines(date,sets){
