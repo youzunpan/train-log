@@ -54,15 +54,25 @@ main.on{display:block}
 #lastBox .beat{color:var(--accent);font-weight:700}
 #lastBox .pr{color:var(--amber);font-weight:700}
 
-/* ── 調整區 ── */
-.stepper{margin-top:12px;display:flex;align-items:stretch;gap:8px}
-.stepper button{flex:1;min-height:60px;background:var(--card2);border:1px solid var(--line);
-  border-radius:14px;color:var(--fg);font-size:20px;font-weight:700}
-.stepper button:active{background:var(--line)}
-.stepper .val{flex:1.4;display:flex;flex-direction:column;align-items:center;justify-content:center;
-  background:var(--card);border-radius:14px;border:1px solid var(--line)}
-.stepper .val b{font-size:30px;font-weight:800;line-height:1.1}
-.stepper .val span{font-size:12px;color:var(--dim)}
+/* ── 日期選擇 ── */
+#dateRow{display:flex;align-items:center;justify-content:space-between;
+  background:var(--card);border:1px solid var(--line);border-radius:12px;
+  padding:8px 14px;margin-bottom:10px;font-size:14px;color:var(--dim)}
+#dateRow input{background:none;border:none;color:var(--fg);font-size:17px;font-weight:700;
+  -webkit-appearance:none;appearance:none;outline:none;color-scheme:dark;
+  font-variant-numeric:tabular-nums;min-height:36px}
+#dateRow.past{border-color:var(--amber)}
+#dateRow.past span{color:var(--amber)}
+
+/* ── 數字輸入區 ── */
+.numrow{margin-top:12px;display:flex;gap:10px}
+.numrow label{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;
+  background:var(--card);border:1px solid var(--line);border-radius:14px;
+  padding:10px 8px 6px;font-size:12px;color:var(--dim)}
+.numrow input{width:100%;background:none;border:none;color:var(--fg);
+  font-size:34px;font-weight:800;text-align:center;outline:none;
+  -webkit-user-select:text;user-select:text;font-variant-numeric:tabular-nums}
+.numrow label:focus-within{border-color:var(--accent)}
 
 #addBtn{margin-top:12px;width:100%;min-height:64px;border:none;border-radius:16px;
   background:var(--accent);color:#08210f;font-size:20px;font-weight:800}
@@ -81,8 +91,12 @@ main.on{display:block}
 .blk .hd{display:flex;justify-content:space-between;align-items:baseline;font-weight:700;font-size:16px}
 .blk .hd .vol{font-size:13px;color:var(--dim);font-weight:500}
 .blk .hd .prtag{color:var(--amber);font-size:12px;font-weight:800;margin-left:6px}
-.blk .rows{margin-top:4px;color:var(--dim);font-size:15px;line-height:1.7}
-.blk .rows b{color:var(--fg);font-weight:600}
+.blk .rows{margin-top:2px}
+.setrow{display:flex;align-items:center;justify-content:space-between;
+  color:var(--dim);font-size:15px;min-height:40px}
+.setrow b{color:var(--fg);font-weight:600}
+.setrow .del{background:none;border:none;color:var(--red);font-size:17px;
+  min-width:44px;min-height:40px;text-align:right;padding-right:2px}
 
 /* ── 底部固定列 ── */
 #foot{position:fixed;left:0;right:0;bottom:0;z-index:10;
@@ -132,6 +146,7 @@ main.on{display:block}
 </nav>
 
 <main id="page-log" class="on">
+  <div id="dateRow"><span id="dateLabel">記錄日期</span><input id="dateIn" type="date"></div>
   <div id="exGrid"></div>
   <div id="customRow">
     <input id="customInput" type="text" placeholder="自訂動作…" enterkeyhint="done">
@@ -140,17 +155,9 @@ main.on{display:block}
 
   <div id="lastBox"></div>
 
-  <div class="stepper" id="wStep">
-    <button data-d="-5">−5</button>
-    <button data-d="-1">−1</button>
-    <div class="val"><b id="wVal" class="num">50</b><span>公斤</span></div>
-    <button data-d="1">＋1</button>
-    <button data-d="5">＋5</button>
-  </div>
-  <div class="stepper" id="rStep">
-    <button data-d="-1">−1</button>
-    <div class="val"><b id="rVal" class="num">10</b><span>次</span></div>
-    <button data-d="1">＋1</button>
+  <div class="numrow">
+    <label>公斤<input id="wIn" type="text" inputmode="decimal" value="50" enterkeyhint="done"></label>
+    <label>次數<input id="rIn" type="text" inputmode="numeric" value="10" enterkeyhint="done"></label>
   </div>
 
   <button id="addBtn" disabled>加入這一組</button>
@@ -225,7 +232,8 @@ function todayStr(){
   const d=new Date(), p=n=>String(n).padStart(2,'0');
   return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate());
 }
-const todaySets=()=>db[todayStr()]||[];
+let curDate=todayStr();               // 目前記錄的日期(可用日期選擇器切換)
+const daySets=()=>db[curDate]||[];
 
 /* ── 統計工具 ── */
 const vol=sets=>sets.reduce((s,x)=>s+x.w*x.r,0);
@@ -244,20 +252,20 @@ function weightSegs(sets){
 const segText=segs=>segs.map(g=>g.w+' '+g.reps.join('/')).join('，');
 const segTextKg=segs=>segs.map(g=>g.w+'kg '+g.reps.join('/')).join('，');
 
-// 上一次做某動作（不含今天）：{date, sets} 或 null
+// 上一次做某動作（選定日期之前）：{date, sets} 或 null
 function lastSession(ex){
-  const dates=Object.keys(db).filter(d=>d!==todayStr()).sort().reverse();
+  const dates=Object.keys(db).filter(d=>d<curDate).sort().reverse();
   for(const d of dates){
     const s=exSets(db[d],ex);
     if(s.length) return {date:d,sets:s};
   }
   return null;
 }
-// 某動作在今天之前的最大單組重量（PR 判定用）
+// 某動作在選定日期之前的最大單組重量（PR 判定用）
 function histMaxW(ex){
   let m=0;
   for(const d of Object.keys(db)){
-    if(d>=todayStr()) continue;
+    if(d>=curDate) continue;
     for(const s of db[d]) if(s.ex===ex&&s.w>m) m=s.w;
   }
   return m;
@@ -279,9 +287,9 @@ function renderGrid(){
 }
 function selectEx(ex){
   curEx=ex;
-  // 預填：今天做過→接續今天最後一組；否則→上次第一組
-  const today=exSets(todaySets(),ex);
-  if(today.length){ curW=today[today.length-1].w; curR=today[today.length-1].r; }
+  // 預填：當日做過→接續當日最後一組；否則→上次第一組
+  const done=exSets(daySets(),ex);
+  if(done.length){ curW=done[done.length-1].w; curR=done[done.length-1].r; }
   else{
     const last=lastSession(ex);
     if(last){ curW=last.sets[0].w; curR=last.sets[0].r; }
@@ -300,50 +308,78 @@ $('customAdd').onclick=()=>{
 };
 $('customInput').addEventListener('keydown',e=>{ if(e.key==='Enter') $('customAdd').onclick(); });
 
-/* ── 調整與加入 ── */
+/* ── 數字輸入與加入 ── */
 function renderControls(){
-  $('wVal').textContent=curW;
-  $('rVal').textContent=curR;
+  if(document.activeElement!==$('wIn')) $('wIn').value=curW;
+  if(document.activeElement!==$('rIn')) $('rIn').value=curR;
   $('addBtn').disabled=!curEx;
   $('addBtn').textContent=curEx?('加入這一組　'+curEx+' '+curW+'kg × '+curR):'先選一個動作';
 }
-$('wStep').addEventListener('click',e=>{
-  const d=e.target.dataset.d; if(!d) return;
-  curW=Math.max(0,curW+ +d); renderControls();
-});
-$('rStep').addEventListener('click',e=>{
-  const d=e.target.dataset.d; if(!d) return;
-  curR=Math.max(1,curR+ +d); renderControls();
-});
+function readNum(el,min,isInt){
+  let v=parseFloat(String(el.value).replace(/[^0-9.]/g,''));
+  if(!isFinite(v)) v=min;
+  if(isInt) v=Math.round(v);
+  return Math.max(min,v);
+}
+$('wIn').addEventListener('input',()=>{ curW=readNum($('wIn'),0,false); renderControls(); });
+$('rIn').addEventListener('input',()=>{ curR=readNum($('rIn'),1,true); renderControls(); });
+for(const id of ['wIn','rIn']){
+  $(id).addEventListener('focus',e=>e.target.select());
+  $(id).addEventListener('blur',()=>renderControls());
+  $(id).addEventListener('keydown',e=>{ if(e.key==='Enter') e.target.blur(); });
+}
 $('addBtn').onclick=()=>{
   if(!curEx) return;
-  const t=todayStr();
-  if(!db[t]) db[t]=[];
-  db[t].push({ex:curEx,w:curW,r:curR});
-  persist(); startTimer(); renderAll();
+  if(!db[curDate]) db[curDate]=[];
+  db[curDate].push({ex:curEx,w:curW,r:curR});
+  persist();
+  if(curDate===todayStr()) startTimer();   // 補記過去日期不啟動組間計時
+  renderAll();
   toast('已記錄　'+curEx+' '+curW+'kg × '+curR);
 };
 $('undoBtn').onclick=()=>{
-  const t=todayStr(), sets=db[t];
+  const sets=db[curDate];
   if(!sets||!sets.length) return;
   const rm=sets.pop();
-  if(!sets.length) delete db[t];
+  if(!sets.length) delete db[curDate];
   persist(); renderAll();
   toast('已刪除　'+rm.ex+' '+rm.w+'kg × '+rm.r);
 };
+function delSet(i){
+  const sets=db[curDate];
+  if(!sets||!sets[i]) return;
+  const rm=sets.splice(i,1)[0];
+  if(!sets.length) delete db[curDate];
+  persist(); renderAll();
+  toast('已刪除　'+rm.ex+' '+rm.w+'kg × '+rm.r);
+}
 $('clearDay').onclick=()=>{
-  if(!todaySets().length){ toast('今天沒有記錄'); return; }
-  if(confirm('確定清除今日全部記錄？此動作無法復原。')){
-    delete db[todayStr()]; persist(); renderAll(); toast('已清除今日記錄');
+  if(!daySets().length){ toast('這一天沒有記錄'); return; }
+  if(confirm('確定清除 '+curDate+' 的全部記錄？此動作無法復原。')){
+    delete db[curDate]; persist(); renderAll(); toast('已清除');
   }
 };
+
+/* ── 日期選擇 ── */
+$('dateIn').value=curDate;
+$('dateIn').max=todayStr();
+$('dateIn').addEventListener('change',()=>{
+  curDate=$('dateIn').value||todayStr();
+  if(curEx) selectEx(curEx);   // 依新日期重新預填
+  renderAll();
+});
+function renderDateRow(){
+  const isToday=curDate===todayStr();
+  $('dateRow').classList.toggle('past',!isToday);
+  $('dateLabel').textContent=isToday?'記錄日期（今天）':'補記過去日期';
+}
 
 /* ── 上次成績 ── */
 function renderLastBox(){
   const box=$('lastBox');
   if(!curEx){ box.classList.remove('show'); return; }
   const last=lastSession(curEx);
-  const tSets=exSets(todaySets(),curEx);
+  const tSets=exSets(daySets(),curEx);
   const tVol=vol(tSets);
   let html='';
   if(last){
@@ -362,35 +398,41 @@ function renderLastBox(){
   box.classList.add('show');
 }
 
-/* ── 今日清單（連續同動作同重量合併為一區塊） ── */
+/* ── 當日清單（連續同動作同重量合併為一區塊，每組可刪） ── */
 function renderToday(){
-  const list=$('todayList'), sets=todaySets();
+  const list=$('todayList'), sets=daySets();
   if(!sets.length){ list.innerHTML=''; return; }
-  // 連續同動作＋同重量 → 一個區塊
+  // 連續同動作＋同重量 → 一個區塊；idx 記錄每組在當日陣列中的位置
   const blocks=[];
-  for(const s of sets){
+  sets.forEach((s,i)=>{
     const last=blocks[blocks.length-1];
-    if(last&&last.ex===s.ex&&last.w===s.w) last.reps.push(s.r);
-    else blocks.push({ex:s.ex,w:s.w,reps:[s.r]});
-  }
-  let html='<h3>今日已記錄</h3>';
+    if(last&&last.ex===s.ex&&last.w===s.w){ last.reps.push(s.r); last.idx.push(i); }
+    else blocks.push({ex:s.ex,w:s.w,reps:[s.r],idx:[i]});
+  });
+  let html='<h3>'+(curDate===todayStr()?'今日已記錄':curDate+' 已記錄')+'</h3>';
   for(let i=blocks.length-1;i>=0;i--){ // 最新在上
     const b=blocks[i];
     const bVol=b.w*b.reps.reduce((a,c)=>a+c,0);
     const pr=histMaxW(b.ex)>0&&b.w>histMaxW(b.ex)?'<span class="prtag">PR</span>':'';
     html+='<div class="blk"><div class="hd"><span>'+b.ex+'　<span class="num">'+b.w+'kg</span>'+pr
         +'</span><span class="vol num">'+fmt(bVol)+' kg</span></div><div class="rows num">'
-        +b.reps.map((r,j)=>'第 '+(j+1)+' 組　<b>'+r+' 次</b>').join('<br>')
+        +b.reps.map((r,j)=>'<div class="setrow"><span>第 '+(j+1)+' 組　<b>'+r
+          +' 次</b></span><button class="del" data-i="'+b.idx[j]+'">✕</button></div>').join('')
         +'</div></div>';
   }
   list.innerHTML=html;
 }
+$('todayList').addEventListener('click',e=>{
+  const btn=e.target.closest('.del');
+  if(btn) delSet(+btn.dataset.i);
+});
 
 /* ── 底部統計 ── */
 function renderFoot(){
-  const sets=todaySets();
+  const sets=daySets();
   const exN=new Set(sets.map(s=>s.ex)).size;
-  $('footStats').innerHTML='今日 <b>'+fmt(vol(sets))+'</b> kg<br>'
+  const label=curDate===todayStr()?'今日':curDate.slice(5);
+  $('footStats').innerHTML=label+' <b>'+fmt(vol(sets))+'</b> kg<br>'
     +exN+' 動作 · '+sets.length+' 組';
 }
 
@@ -421,9 +463,9 @@ function exportLines(date,sets){
   });
 }
 function buildExport(){
-  const t=todayStr(), sets=todaySets();
-  if(!sets.length) return t+' 訓練記錄\n\n（今天還沒有記錄）';
-  return t+' 訓練記錄\n\n'+exportLines(t,sets).join('\n')
+  const sets=daySets();
+  if(!sets.length) return curDate+' 訓練記錄\n\n（這一天沒有記錄）';
+  return curDate+' 訓練記錄\n\n'+exportLines(curDate,sets).join('\n')
     +'\n\n總訓練量 '+fmt(vol(sets))+' kg';
 }
 $('copyBtn').onclick=async()=>{
@@ -501,7 +543,7 @@ function toast(msg){
 }
 
 function renderAll(){
-  renderGrid(); renderControls(); renderLastBox(); renderToday(); renderFoot();
+  renderDateRow(); renderGrid(); renderControls(); renderLastBox(); renderToday(); renderFoot();
   if($('page-export').classList.contains('on')) $('exportText').textContent=buildExport();
   if($('page-history').classList.contains('on')) renderHistory();
 }
