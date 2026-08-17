@@ -102,14 +102,19 @@ main.on{display:block}
 #foot{position:fixed;left:0;right:0;bottom:0;z-index:10;
   background:rgba(20,24,29,.95);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
   border-top:1px solid var(--line);
-  padding:10px 14px calc(10px + env(safe-area-inset-bottom));
-  display:flex;align-items:center;justify-content:space-between;gap:10px}
-#foot .stats{font-size:14px;color:var(--dim);line-height:1.4}
-#foot .stats b{color:var(--fg);font-size:17px;font-weight:800}
-#timerBtn{min-width:118px;min-height:56px;border-radius:14px;border:1px solid var(--line);
+  padding:10px 10px calc(10px + env(safe-area-inset-bottom));
+  display:flex;align-items:center;justify-content:space-between;gap:8px}
+#foot .stats{font-size:13px;color:var(--dim);line-height:1.4;flex:1;min-width:0}
+#foot .stats b{color:var(--fg);font-size:16px;font-weight:800}
+#restSel{display:flex;gap:6px}
+#restSel button{min-width:44px;min-height:56px;background:var(--card2);
+  border:1px solid var(--line);border-radius:12px;color:var(--dim);
+  font-size:14px;font-weight:700;font-variant-numeric:tabular-nums}
+#restSel button.sel{border-color:var(--accent);color:var(--accent);background:var(--accent-dim)}
+#timerBtn{min-width:100px;min-height:56px;border-radius:14px;border:1px solid var(--line);
   background:var(--card2);color:var(--dim);font-size:11px;font-weight:600;
   display:flex;flex-direction:column;align-items:center;justify-content:center;
-  line-height:1.25;padding:4px 10px}
+  line-height:1.25;padding:4px 8px}
 #timerBtn b{font-size:20px;font-weight:800;color:var(--fg);font-variant-numeric:tabular-nums}
 #timerBtn.done{background:var(--accent);border-color:var(--accent);color:#08210f;
   animation:pulse 1s ease-in-out infinite}
@@ -189,7 +194,11 @@ main.on{display:block}
 
 <footer id="foot">
   <div class="stats num" id="footStats"></div>
-  <button id="timerBtn" class="num">0:00</button>
+  <div id="restSel">
+    <button data-s="60">60秒</button>
+    <button data-s="90">90秒</button>
+  </div>
+  <button id="timerBtn"><span>組間休息</span><b>開始</b></button>
 </footer>
 
 <div id="toast"></div>
@@ -338,7 +347,6 @@ $('addBtn').onclick=()=>{
   if(!db[curDate]) db[curDate]=[];
   db[curDate].push({ex:curEx,w:curW,r:curR});
   persist();
-  if(curDate===todayStr()) startTimer();   // 補記過去日期不啟動組間計時
   renderAll();
   toast('已記錄　'+curEx+' '+curW+'kg × '+curR);
 };
@@ -443,7 +451,7 @@ function renderFoot(){
 
 /* ── 組間休息倒數計時器 ── */
 const RKEY='trainlog-rest-v1';
-const REST_PRESETS=[60,90,120,150,180];
+const REST_PRESETS=[60,90];
 let restSec=parseInt(localStorage.getItem(RKEY),10);
 if(!REST_PRESETS.includes(restSec)) restSec=90;
 let tm=null;        // {start} 倒數起點;null = 尚未開始
@@ -470,18 +478,23 @@ function beep(){
   }catch(e){}
 }
 function startTimer(){ ensureAudio(); tm={start:Date.now()}; beeped=false; tickTimer(); }
-$('timerBtn').onclick=()=>{   // 點計時器 = 切換休息秒數
-  ensureAudio();
-  restSec=REST_PRESETS[(REST_PRESETS.indexOf(restSec)+1)%REST_PRESETS.length];
+$('timerBtn').onclick=startTimer;   // 點計時器 = 開始（或重新開始）倒數
+$('restSel').addEventListener('click',e=>{   // 60／90 秒切換
+  const s=e.target.dataset.s; if(!s) return;
+  restSec=+s;
   localStorage.setItem(RKEY,restSec);
-  toast('組間休息:'+restSec+' 秒');
-  tickTimer();
-};
+  renderRestSel(); tickTimer();
+});
+function renderRestSel(){
+  document.querySelectorAll('#restSel button')
+    .forEach(b=>b.classList.toggle('sel',+b.dataset.s===restSec));
+}
+renderRestSel();
 function tickTimer(){
   const btn=$('timerBtn');
   if(!tm){
     btn.className=''; btn.style.background='';
-    btn.innerHTML='<span>組間休息</span><b>'+restSec+' 秒</b>';
+    btn.innerHTML='<span>組間休息</span><b>開始</b>';
     return;
   }
   const remain=Math.ceil((tm.start+restSec*1000-Date.now())/1000);
