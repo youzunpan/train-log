@@ -113,6 +113,7 @@ main.on{display:block}
   font-size:14px;font-weight:700;font-variant-numeric:tabular-nums}
 #restSel button.sel{border-color:var(--accent);color:var(--accent);background:var(--accent-dim)}
 #timerBtn{min-width:100px;min-height:56px;border-radius:14px;border:1px solid var(--line);
+  text-decoration:none;cursor:pointer;
   background:var(--card2);color:var(--dim);font-size:11px;font-weight:600;
   display:flex;flex-direction:column;align-items:center;justify-content:center;
   line-height:1.25;padding:4px 8px}
@@ -133,6 +134,14 @@ main.on{display:block}
   background:var(--card2);border:1px solid var(--line);border-radius:12px;color:var(--dim);
   font-size:14px;font-weight:600}
 .subbtns input{display:none}
+
+#howto{margin-top:14px;background:var(--card);border:1px solid var(--line);
+  border-radius:12px;padding:12px 14px;font-size:14px;color:var(--dim);line-height:1.7}
+#howto summary{color:var(--fg);font-weight:700;font-size:15px;cursor:pointer;min-height:32px}
+#howto div{margin-top:8px}
+#howto ol{margin:8px 0 0 20px}
+#howto li{margin-bottom:5px}
+#howto b{color:var(--accent)}
 
 /* ── 歷史頁 ── */
 .day{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:10px}
@@ -189,6 +198,22 @@ main.on{display:block}
   <div class="subbtns">
     <button id="clearDay" style="color:var(--red)">清除今日記錄</button>
   </div>
+  <details id="howto">
+    <summary>組間計時器設定方法（第一次使用）</summary>
+    <div>
+      計時器會跳到 iPhone 內建的「時鐘」倒數，不會中斷你正在聽的音樂。
+      需要先在「捷徑」App 裡建立兩個捷徑（只需做一次）：
+      <ol>
+        <li>打開「捷徑」App → 右上角 <b>＋</b></li>
+        <li>搜尋並加入動作「<b>開始計時器</b>」</li>
+        <li>把時間設成 <b>90 秒</b></li>
+        <li>把捷徑命名為 <b>休息90</b>（名稱必須完全一樣）</li>
+        <li>重複一次，時間 <b>120 秒</b>，命名為 <b>休息120</b></li>
+      </ol>
+      之後在記錄頁按下計時器，就會自動跳到時鐘開始倒數，時間到會用系統鬧鈴提醒；
+      回到本 App 按左上角返回即可。
+    </div>
+  </details>
 </main>
 
 <main id="page-history"><div id="histList"></div></main>
@@ -199,7 +224,7 @@ main.on{display:block}
     <button data-s="90">90秒</button>
     <button data-s="120">120秒</button>
   </div>
-  <button id="timerBtn"><span>組間休息</span><b>開始</b></button>
+  <a id="timerBtn"><span>組間休息</span><b>開始</b></a>
 </footer>
 
 <div id="toast"></div>
@@ -450,115 +475,57 @@ function renderFoot(){
     +exN+' 動作 · '+sets.length+' 組';
 }
 
-/* ── 組間休息倒數計時器（背景也會提醒） ── */
-const RKEY='trainlog-rest-v1';
+/* ── 組間休息計時器：交給 iOS 內建計時器，完全不碰音訊，不中斷音樂 ── */
+const RKEY='trainlog-rest-v1', TKEY='trainlog-timer-end';
 const REST_PRESETS=[90,120];
 let restSec=parseInt(localStorage.getItem(RKEY),10);
 if(!REST_PRESETS.includes(restSec)) restSec=90;
 let tm=null;          // {end} 倒數結束時間戳；null = 尚未開始
-let beeped=false;
-let audioCtx=null, schedNodes=[], endTimer=null;
+let notified=false, endTimer=null;
 
-/* 通知：iOS 需已加入主畫面，且通知由 service worker 送出 */
+const isIOS=/iP(hone|ad|od)/.test(navigator.userAgent)
+  ||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+/* 對應「捷徑」App 裡名為「休息90」／「休息120」的捷徑 */
+const shortcutUrl=sec=>'shortcuts://run-shortcut?name='+encodeURIComponent('休息'+sec);
+
+/* service worker：離線快取（Android 上另可送出結束通知） */
 let swReg=null;
 if('serviceWorker' in navigator){
   navigator.serviceWorker.register('sw.js').then(r=>{swReg=r;}).catch(()=>{});
 }
 function askNotify(){
   try{
-    if(!('Notification' in window)) return;
-    if(Notification.permission==='default')
-      Notification.requestPermission().then(p=>{
-        if(p==='granted') toast('已開啟休息提醒通知');
-        else if(p==='denied') toast('通知未開啟，仍會有提示音');
-      });
+    if(isIOS||!('Notification' in window)) return;   // iOS 交給內建計時器，不需要通知權限
+    if(Notification.permission==='default') Notification.requestPermission();
   }catch(e){}
 }
 function notify(){
   try{
-    if(!('Notification' in window)||Notification.permission!=='granted') return;
+    if(isIOS||!('Notification' in window)||Notification.permission!=='granted') return;
     const opt={body:'休息 '+restSec+' 秒到了，開始下一組！',
-      icon:'icon-512.png',badge:'icon-180.png',tag:'rest',renotify:true,
-      vibrate:[200,100,200],silent:false};
+      icon:'icon-512.png',badge:'icon-180.png',tag:'rest',renotify:true,vibrate:[200,100,200]};
     if(swReg&&swReg.showNotification) swReg.showNotification('訓練記錄',opt);
     else new Notification('訓練記錄',opt);
   }catch(e){}
 }
 
-/* 近乎無聲的循環音軌：讓 iOS 在鎖屏／切換 App 後仍保持本頁音訊活著，
-   倒數才不會被系統凍結，排定的提示音與通知才能準時發出 */
-let keepEl=null;
-function keepAliveUrl(){
-  const sr=8000,len=sr*2,buf=new ArrayBuffer(44+len*2),v=new DataView(buf);
-  const w=(o,s)=>{for(let i=0;i<s.length;i++)v.setUint8(o+i,s.charCodeAt(i));};
-  w(0,'RIFF');v.setUint32(4,36+len*2,true);w(8,'WAVEfmt ');
-  v.setUint32(16,16,true);v.setUint16(20,1,true);v.setUint16(22,1,true);
-  v.setUint32(24,sr,true);v.setUint32(28,sr*2,true);v.setUint16(32,2,true);v.setUint16(34,16,true);
-  w(36,'data');v.setUint32(40,len*2,true);
-  for(let i=0;i<len;i++) v.setInt16(44+i*2,(i%2)?1:-1,true);   // ±1 LSB，聽不見
-  return URL.createObjectURL(new Blob([buf],{type:'audio/wav'}));
-}
-function startKeepAlive(){
-  try{
-    if(!keepEl){
-      keepEl=document.createElement('audio');
-      keepEl.loop=true; keepEl.preload='auto';
-      keepEl.setAttribute('playsinline','');
-      keepEl.src=keepAliveUrl();
-      document.body.appendChild(keepEl);
-    }
-    keepEl.currentTime=0;
-    const p=keepEl.play(); if(p&&p.catch) p.catch(()=>{});
-  }catch(e){}
-}
-function stopKeepAlive(){ try{ if(keepEl) keepEl.pause(); }catch(e){} }
-
-function ensureAudio(){   // 必須在使用者手勢中建立，iOS 才允許發聲
-  try{
-    audioCtx=audioCtx||new (window.AudioContext||window.webkitAudioContext)();
-    if(audioCtx.resume) audioCtx.resume();
-  }catch(e){}
-}
-/* 提前把提示音排進音訊時間軸：即使 JS 被系統節流，聲音仍會準時響 */
-function scheduleBeep(sec){
-  clearSched();
-  if(!audioCtx) return;
-  try{
-    const t0=audioCtx.currentTime+sec;
-    [0,0.3,0.6].forEach(off=>{
-      const o=audioCtx.createOscillator(),g=audioCtx.createGain();
-      o.frequency.value=880;o.connect(g);g.connect(audioCtx.destination);
-      g.gain.setValueAtTime(0.0001,t0+off);
-      g.gain.exponentialRampToValueAtTime(0.4,t0+off+0.02);
-      g.gain.exponentialRampToValueAtTime(0.0001,t0+off+0.22);
-      o.start(t0+off);o.stop(t0+off+0.24);
-      schedNodes.push(o);
-    });
-  }catch(e){}
-}
-function clearSched(){
-  schedNodes.forEach(o=>{try{o.stop(0);o.disconnect();}catch(e){}});
-  schedNodes=[];
-}
-
-function startTimer(){
-  ensureAudio(); askNotify(); startKeepAlive();
+function startTimer(){        // 只負責 App 內的視覺倒數；真正的鬧鈴由內建計時器負責
+  askNotify();
   tm={end:Date.now()+restSec*1000};
-  beeped=false;
-  scheduleBeep(restSec);
+  try{ localStorage.setItem(TKEY,tm.end); }catch(e){}
+  notified=false;
   clearTimeout(endTimer);
   endTimer=setTimeout(onRestEnd,restSec*1000);
   tickTimer();
 }
 function onRestEnd(){
-  beeped=true;
+  notified=true;
   notify();
   try{ if(navigator.vibrate) navigator.vibrate([200,100,200]); }catch(e){}
-  setTimeout(stopKeepAlive,3000);   // 響完再放掉音訊，省電
   tickTimer();
 }
-$('timerBtn').onclick=startTimer;    // 點計時器 = 開始（或重新開始）倒數
-$('restSel').addEventListener('click',e=>{   // 90／120 秒切換
+$('timerBtn').addEventListener('click',startTimer);   // href 同時跳到捷徑啟動內建計時器
+$('restSel').addEventListener('click',e=>{            // 90／120 秒切換
   const s=e.target.dataset.s; if(!s) return;
   restSec=+s;
   localStorage.setItem(RKEY,restSec);
@@ -567,6 +534,9 @@ $('restSel').addEventListener('click',e=>{   // 90／120 秒切換
 function renderRestSel(){
   document.querySelectorAll('#restSel button')
     .forEach(b=>b.classList.toggle('sel',+b.dataset.s===restSec));
+  const btn=$('timerBtn');
+  if(isIOS) btn.setAttribute('href',shortcutUrl(restSec));
+  else btn.removeAttribute('href');
 }
 renderRestSel();
 function tickTimer(){
@@ -578,7 +548,7 @@ function tickTimer(){
   }
   const remain=Math.ceil((tm.end-Date.now())/1000);
   if(remain<=0){
-    if(!beeped) onRestEnd();
+    if(!notified) onRestEnd();
     btn.className='done'; btn.style.background='';
     btn.innerHTML='<span>休息結束</span><b>開始下一組！</b>';
   }else{
@@ -588,6 +558,15 @@ function tickTimer(){
     btn.innerHTML='<span>休息中</span><b>'+Math.floor(remain/60)+':'+String(remain%60).padStart(2,'0')+'</b>';
   }
 }
+/* 跳去捷徑再回來時，App 可能被重新載入：接回原本的倒數 */
+(function restoreTimer(){
+  const e=parseInt(localStorage.getItem(TKEY),10);
+  if(e&&e>Date.now()&&e-Date.now()<=REST_PRESETS[REST_PRESETS.length-1]*1000){
+    tm={end:e}; notified=false;
+    clearTimeout(endTimer);
+    endTimer=setTimeout(onRestEnd,e-Date.now());
+  }
+})();
 setInterval(tickTimer,500);
 document.addEventListener('visibilitychange',()=>{ if(!document.hidden) tickTimer(); });
 tickTimer();
