@@ -486,7 +486,8 @@ let notified=false, endTimer=null;
 const isIOS=/iP(hone|ad|od)/.test(navigator.userAgent)
   ||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
 /* 對應「捷徑」App 裡名為「休息90」／「休息120」的捷徑 */
-const shortcutUrl=sec=>'shortcuts://run-shortcut?name='+encodeURIComponent('休息'+sec);
+/* x-callback-url 形式：捷徑執行完會自動跳回呼叫它的 App（一般 run-shortcut 會停在捷徑裡） */
+const shortcutUrl=sec=>'shortcuts://x-callback-url/run-shortcut?name='+encodeURIComponent('休息'+sec);
 
 /* service worker：離線快取（Android 上另可送出結束通知） */
 let swReg=null;
