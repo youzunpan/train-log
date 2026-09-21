@@ -453,9 +453,18 @@ function renderFoot(){
   $('footSub').textContent=exN+' 動作 · '+sets.length+' 組';
 }
 
-/* service worker：離線快取，讓健身房沒訊號也開得起來 */
+/* service worker：離線快取（健身房沒訊號也開得起來）＋ 自動更新 */
 if('serviceWorker' in navigator){
-  navigator.serviceWorker.register('sw.js').catch(()=>{});
+  navigator.serviceWorker.register('sw.js',{updateViaCache:'none'}).then(reg=>{
+    const check=()=>{ if(!document.hidden) reg.update().catch(()=>{}); };
+    check();
+    document.addEventListener('visibilitychange',check);   // 每次回到 App 就檢查新版
+  }).catch(()=>{});
+  let reloading=false;
+  navigator.serviceWorker.addEventListener('controllerchange',()=>{
+    if(reloading) return;                                   // 新版接手後自動重新載入
+    reloading=true; location.reload();
+  });
 }
 
 /* ── 匯出文字 ── */
