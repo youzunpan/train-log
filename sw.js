@@ -1,5 +1,5 @@
 /* 訓練記錄 service worker:離線快取 + 組間休息通知 */
-const CACHE='trainlog-v5';
+const CACHE='trainlog-v6';
 const ASSETS=['./','./index.html','./icon-180.png','./icon-512.png','./manifest.json'];
 
 self.addEventListener('install',e=>{

@@ -201,17 +201,22 @@ main.on{display:block}
   <details id="howto">
     <summary>組間計時器設定方法（第一次使用）</summary>
     <div>
-      計時器會跳到 iPhone 內建的「時鐘」倒數，不會中斷你正在聽的音樂。
-      需要先在「捷徑」App 裡建立兩個捷徑（只需做一次）：
+      iPhone 的網頁 App 無法在背景計時，也無法從別的 App 自動跳回來，
+      所以真正的鬧鈴交給系統計時器、用「<b>背面輕點</b>」在背景啟動——
+      畫面不會離開本 App，也不會中斷音樂。設定只需做一次：
       <ol>
-        <li>打開「捷徑」App → 右上角 <b>＋</b></li>
-        <li>搜尋並加入動作「<b>開始計時器</b>」</li>
-        <li>把時間設成 <b>90 秒</b></li>
-        <li>把捷徑命名為 <b>休息90</b>（名稱必須完全一樣）</li>
-        <li>重複一次，時間 <b>120 秒</b>，命名為 <b>休息120</b></li>
+        <li>打開「捷徑」App → 右上角 <b>＋</b> → 加入動作「<b>開始計時器</b>」
+            → 時間設 <b>90 秒</b> → 命名為 <b>休息90</b></li>
+        <li>回到「設定」→ <b>輔助使用</b> → <b>觸控</b> → 滑到最底
+            → <b>背面輕點</b> → <b>輕點兩下</b> → 選擇捷徑 <b>休息90</b></li>
       </ol>
-      之後在記錄頁按下計時器，就會自動跳到時鐘開始倒數，時間到會用系統鬧鈴提醒；
-      回到本 App 按左上角返回即可。
+      之後記錄完一組，<b>輕點手機背面兩下</b>，系統計時器就在背景開始倒數，
+      時間到用系統鬧鈴提醒，音樂只會短暫降低音量不會停。
+      想要 120 秒可再建一個「休息120」指定給「輕點三下」。
+      iPhone 15 Pro 以上也可改用<b>動作按鈕</b>。
+      <br><br>
+      下方記錄頁的計時器按鈕只是 App 內的視覺倒數，方便你回頭看還剩多久，
+      按了不會離開頁面，也不會發出聲音。
     </div>
   </details>
 </main>
@@ -224,7 +229,7 @@ main.on{display:block}
     <button data-s="90">90秒</button>
     <button data-s="120">120秒</button>
   </div>
-  <a id="timerBtn"><span>組間休息</span><b>開始</b></a>
+  <button id="timerBtn"><span>組間休息</span><b>開始</b></button>
 </footer>
 
 <div id="toast"></div>
@@ -485,9 +490,6 @@ let notified=false, endTimer=null;
 
 const isIOS=/iP(hone|ad|od)/.test(navigator.userAgent)
   ||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
-/* 對應「捷徑」App 裡名為「休息90」／「休息120」的捷徑 */
-/* x-callback-url 形式：捷徑執行完會自動跳回呼叫它的 App（一般 run-shortcut 會停在捷徑裡） */
-const shortcutUrl=sec=>'shortcuts://x-callback-url/run-shortcut?name='+encodeURIComponent('休息'+sec);
 
 /* service worker：離線快取（Android 上另可送出結束通知） */
 let swReg=null;
@@ -535,9 +537,6 @@ $('restSel').addEventListener('click',e=>{            // 90／120 秒切換
 function renderRestSel(){
   document.querySelectorAll('#restSel button')
     .forEach(b=>b.classList.toggle('sel',+b.dataset.s===restSec));
-  const btn=$('timerBtn');
-  if(isIOS) btn.setAttribute('href',shortcutUrl(restSec));
-  else btn.removeAttribute('href');
 }
 renderRestSel();
 function tickTimer(){
