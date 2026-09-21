@@ -55,6 +55,13 @@ main.on{display:block}
 #lastBox .beat{color:var(--accent);font-weight:700}
 #lastBox .pr{color:var(--amber);font-weight:700}
 
+/* ── 備份提醒 ── */
+#backupWarn{display:none;margin-bottom:10px;padding:12px 14px;border-radius:12px;
+  background:#3a2a10;border:1px solid var(--amber);color:var(--amber);
+  font-size:14px;font-weight:600;line-height:1.5;width:100%;text-align:left}
+#backupWarn.show{display:block}
+#backupInfo{margin-top:8px;font-size:13px;color:var(--dim);text-align:center}
+
 /* ── 日期選擇 ── */
 #dateRow{display:flex;align-items:center;justify-content:space-between;
   background:var(--card);border:1px solid var(--line);border-radius:12px;
@@ -152,6 +159,7 @@ main.on{display:block}
 </nav>
 
 <main id="page-log" class="on">
+  <button id="backupWarn"></button>
   <div id="dateRow"><span id="dateLabel">記錄日期</span><input id="dateIn" type="date"></div>
   <div id="exGrid"></div>
   <div id="customRow">
@@ -177,9 +185,11 @@ main.on{display:block}
 <main id="page-export">
   <div id="exportText" class="num"></div>
   <button id="copyBtn" class="bigbtn">一鍵複製</button>
+  <button id="backupBtn" class="bigbtn" style="background:var(--accent);color:#08210f">備份全部記錄</button>
+  <div id="backupInfo"></div>
   <div class="subbtns">
-    <button id="jsonExport">匯出 JSON 備份</button>
-    <label>匯入 JSON<input id="jsonImport" type="file" accept=".json,application/json"></label>
+    <button id="jsonExport">下載 JSON 檔</button>
+    <label>還原備份<input id="jsonImport" type="file" accept=".json,application/json"></label>
   </div>
   <div class="subbtns">
     <button id="clearDay" style="color:var(--red)">清除今日記錄</button>
@@ -494,13 +504,57 @@ $('copyBtn').onclick=async()=>{
   }
 };
 
-/* ── JSON 備份 ── */
-$('jsonExport').onclick=()=>{
+/* ── 備份 ── */
+const BKEY='trainlog-lastbackup';
+const lastBackup=()=>{ const v=parseInt(localStorage.getItem(BKEY),10); return isFinite(v)?v:0; };
+const daysSinceBackup=()=>{ const b=lastBackup(); return b?Math.floor((Date.now()-b)/864e5):null; };
+function markBackup(){
+  try{ localStorage.setItem(BKEY,Date.now()); }catch(e){}
+  renderBackupInfo(); renderBanner();
+}
+function backupName(){ return '訓練記錄-backup-'+todayStr()+'.json'; }
+function downloadBackup(){
   const blob=new Blob([JSON.stringify(db,null,1)],{type:'application/json'});
   const a=document.createElement('a');
   a.href=URL.createObjectURL(blob);
-  a.download='訓練記錄-backup-'+todayStr()+'.json';
+  a.download=backupName();
   a.click(); URL.revokeObjectURL(a.href);
+  markBackup();
+}
+/* 主要備份路徑：叫出 iOS 分享選單，可一鍵存進「檔案」／iCloud 雲碟 */
+$('backupBtn').onclick=async()=>{
+  const json=JSON.stringify(db,null,1);
+  try{
+    const file=new File([json],backupName(),{type:'application/json'});
+    if(navigator.canShare&&navigator.canShare({files:[file]})){
+      await navigator.share({files:[file],title:'訓練記錄備份'});
+      markBackup(); toast('備份完成');
+      return;
+    }
+  }catch(e){
+    if(e&&e.name==='AbortError') return;    // 使用者自己取消，不要再跳下載
+  }
+  downloadBackup(); toast('已下載備份檔');
+};
+$('jsonExport').onclick=()=>{ downloadBackup(); toast('已下載備份檔'); };
+
+function renderBackupInfo(){
+  const d=daysSinceBackup();
+  $('backupInfo').textContent = d===null ? '還沒備份過'
+    : d===0 ? '上次備份：今天'
+    : '上次備份：'+d+' 天前';
+}
+function renderBanner(){
+  const el=$('backupWarn'), d=daysSinceBackup();
+  const sessions=Object.keys(db).length;
+  if(!sessions||(d!==null&&d<7)){ el.classList.remove('show'); return; }
+  el.textContent = d===null
+    ? '⚠️ 還沒備份過　刪除 App 或換手機記錄就會消失，點這裡備份'
+    : '⚠️ 已 '+d+' 天沒備份　點這裡備份';
+  el.classList.add('show');
+}
+$('backupWarn').onclick=()=>{
+  document.querySelector('#tabs button[data-page="export"]').click();
 };
 $('jsonImport').addEventListener('change',e=>{
   const f=e.target.files[0]; if(!f) return;
@@ -559,6 +613,7 @@ function toast(msg){
 
 function renderAll(){
   renderDateRow(); renderGrid(); renderControls(); renderLastBox(); renderToday(); renderFoot();
+  renderBanner(); renderBackupInfo();
   if($('page-export').classList.contains('on')) $('exportText').textContent=buildExport();
   if($('page-history').classList.contains('on')) renderHistory();
 }
