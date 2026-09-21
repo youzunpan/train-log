@@ -103,25 +103,11 @@ main.on{display:block}
 #foot{position:fixed;left:0;right:0;bottom:0;z-index:10;
   background:rgba(20,24,29,.95);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
   border-top:1px solid var(--line);
-  padding:10px 10px calc(10px + env(safe-area-inset-bottom));
-  display:flex;align-items:center;justify-content:space-between;gap:8px}
-#foot .stats{font-size:13px;color:var(--dim);line-height:1.4;flex:1;min-width:0}
-#foot .stats b{color:var(--fg);font-size:16px;font-weight:800}
-#restSel{display:flex;gap:6px}
-#restSel button{min-width:52px;min-height:56px;padding:0 4px;background:var(--card2);
-  border:1px solid var(--line);border-radius:12px;color:var(--dim);
-  font-size:14px;font-weight:700;font-variant-numeric:tabular-nums}
-#restSel button.sel{border-color:var(--accent);color:var(--accent);background:var(--accent-dim)}
-#timerBtn{min-width:100px;min-height:56px;border-radius:14px;border:1px solid var(--line);
-  text-decoration:none;cursor:pointer;
-  background:var(--card2);color:var(--dim);font-size:11px;font-weight:600;
-  display:flex;flex-direction:column;align-items:center;justify-content:center;
-  line-height:1.25;padding:4px 8px}
-#timerBtn b{font-size:20px;font-weight:800;color:var(--fg);font-variant-numeric:tabular-nums}
-#timerBtn.done{background:var(--accent);border-color:var(--accent);color:#08210f;
-  animation:pulse 1s ease-in-out infinite}
-#timerBtn.done b{color:#08210f;font-size:15px}
-@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
+  padding:12px 16px calc(12px + env(safe-area-inset-bottom));
+  display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+#foot .stats{font-size:14px;color:var(--dim)}
+#foot .stats b{color:var(--fg);font-size:22px;font-weight:800;margin:0 2px}
+#foot .sub{font-size:14px;color:var(--dim)}
 
 /* ── 匯出頁 ── */
 #exportText{width:100%;background:var(--card);border:1px solid var(--line);border-radius:12px;
@@ -199,24 +185,15 @@ main.on{display:block}
     <button id="clearDay" style="color:var(--red)">清除今日記錄</button>
   </div>
   <details id="howto">
-    <summary>組間計時器設定方法（第一次使用）</summary>
+    <summary>組間休息計時（備忘）</summary>
     <div>
-      iPhone 的網頁 App 無法在背景計時，也無法從別的 App 自動跳回來，
-      所以真正的鬧鈴交給系統計時器、用「<b>背面輕點</b>」在背景啟動——
-      畫面不會離開本 App，也不會中斷音樂。設定只需做一次：
+      組間休息不由本 App 負責，改用 iPhone 系統計時器，才不會中斷音樂、也能在背景提醒。
+      換手機時重新設定一次即可：
       <ol>
-        <li>打開「捷徑」App → 右上角 <b>＋</b> → 加入動作「<b>開始計時器</b>」
-            → 時間設 <b>90 秒</b> → 命名為 <b>休息90</b></li>
-        <li>回到「設定」→ <b>輔助使用</b> → <b>觸控</b> → 滑到最底
-            → <b>背面輕點</b> → <b>輕點兩下</b> → 選擇捷徑 <b>休息90</b></li>
+        <li>「捷徑」App → <b>＋</b> → 動作「<b>開始計時器</b>」→ <b>90 秒</b> → 命名 <b>休息90</b></li>
+        <li>「設定」→ <b>輔助使用</b> → <b>觸控</b> → <b>背面輕點</b> → <b>輕點兩下</b> → 選 <b>休息90</b></li>
       </ol>
-      之後記錄完一組，<b>輕點手機背面兩下</b>，系統計時器就在背景開始倒數，
-      時間到用系統鬧鈴提醒，音樂只會短暫降低音量不會停。
-      想要 120 秒可再建一個「休息120」指定給「輕點三下」。
-      iPhone 15 Pro 以上也可改用<b>動作按鈕</b>。
-      <br><br>
-      下方記錄頁的計時器按鈕只是 App 內的視覺倒數，方便你回頭看還剩多久，
-      按了不會離開頁面，也不會發出聲音。
+      記錄完一組後輕點手機背面兩下即可開始倒數，畫面不會離開本 App。
     </div>
   </details>
 </main>
@@ -225,11 +202,7 @@ main.on{display:block}
 
 <footer id="foot">
   <div class="stats num" id="footStats"></div>
-  <div id="restSel">
-    <button data-s="90">90秒</button>
-    <button data-s="120">120秒</button>
-  </div>
-  <button id="timerBtn"><span>組間休息</span><b>開始</b></button>
+  <div class="sub num" id="footSub"></div>
 </footer>
 
 <div id="toast"></div>
@@ -476,100 +449,14 @@ function renderFoot(){
   const sets=daySets();
   const exN=new Set(sets.map(s=>s.ex)).size;
   const label=curDate===todayStr()?'今日':curDate.slice(5);
-  $('footStats').innerHTML=label+' <b>'+fmt(vol(sets))+'</b> kg<br>'
-    +exN+' 動作 · '+sets.length+' 組';
+  $('footStats').innerHTML=label+'<b>'+fmt(vol(sets))+'</b>kg';
+  $('footSub').textContent=exN+' 動作 · '+sets.length+' 組';
 }
 
-/* ── 組間休息計時器：交給 iOS 內建計時器，完全不碰音訊，不中斷音樂 ── */
-const RKEY='trainlog-rest-v1', TKEY='trainlog-timer-end';
-const REST_PRESETS=[90,120];
-let restSec=parseInt(localStorage.getItem(RKEY),10);
-if(!REST_PRESETS.includes(restSec)) restSec=90;
-let tm=null;          // {end} 倒數結束時間戳；null = 尚未開始
-let notified=false, endTimer=null;
-
-const isIOS=/iP(hone|ad|od)/.test(navigator.userAgent)
-  ||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
-
-/* service worker：離線快取（Android 上另可送出結束通知） */
-let swReg=null;
+/* service worker：離線快取，讓健身房沒訊號也開得起來 */
 if('serviceWorker' in navigator){
-  navigator.serviceWorker.register('sw.js').then(r=>{swReg=r;}).catch(()=>{});
+  navigator.serviceWorker.register('sw.js').catch(()=>{});
 }
-function askNotify(){
-  try{
-    if(isIOS||!('Notification' in window)) return;   // iOS 交給內建計時器，不需要通知權限
-    if(Notification.permission==='default') Notification.requestPermission();
-  }catch(e){}
-}
-function notify(){
-  try{
-    if(isIOS||!('Notification' in window)||Notification.permission!=='granted') return;
-    const opt={body:'休息 '+restSec+' 秒到了，開始下一組！',
-      icon:'icon-512.png',badge:'icon-180.png',tag:'rest',renotify:true,vibrate:[200,100,200]};
-    if(swReg&&swReg.showNotification) swReg.showNotification('訓練記錄',opt);
-    else new Notification('訓練記錄',opt);
-  }catch(e){}
-}
-
-function startTimer(){        // 只負責 App 內的視覺倒數；真正的鬧鈴由內建計時器負責
-  askNotify();
-  tm={end:Date.now()+restSec*1000};
-  try{ localStorage.setItem(TKEY,tm.end); }catch(e){}
-  notified=false;
-  clearTimeout(endTimer);
-  endTimer=setTimeout(onRestEnd,restSec*1000);
-  tickTimer();
-}
-function onRestEnd(){
-  notified=true;
-  notify();
-  try{ if(navigator.vibrate) navigator.vibrate([200,100,200]); }catch(e){}
-  tickTimer();
-}
-$('timerBtn').addEventListener('click',startTimer);   // href 同時跳到捷徑啟動內建計時器
-$('restSel').addEventListener('click',e=>{            // 90／120 秒切換
-  const s=e.target.dataset.s; if(!s) return;
-  restSec=+s;
-  localStorage.setItem(RKEY,restSec);
-  renderRestSel(); tickTimer();
-});
-function renderRestSel(){
-  document.querySelectorAll('#restSel button')
-    .forEach(b=>b.classList.toggle('sel',+b.dataset.s===restSec));
-}
-renderRestSel();
-function tickTimer(){
-  const btn=$('timerBtn');
-  if(!tm){
-    btn.className=''; btn.style.background='';
-    btn.innerHTML='<span>組間休息</span><b>開始</b>';
-    return;
-  }
-  const remain=Math.ceil((tm.end-Date.now())/1000);
-  if(remain<=0){
-    if(!notified) onRestEnd();
-    btn.className='done'; btn.style.background='';
-    btn.innerHTML='<span>休息結束</span><b>開始下一組！</b>';
-  }else{
-    const pct=100*(1-remain/restSec);
-    btn.className='';
-    btn.style.background='linear-gradient(to right, rgba(74,222,128,.22) '+pct+'%, var(--card2) '+pct+'%)';
-    btn.innerHTML='<span>休息中</span><b>'+Math.floor(remain/60)+':'+String(remain%60).padStart(2,'0')+'</b>';
-  }
-}
-/* 跳去捷徑再回來時，App 可能被重新載入：接回原本的倒數 */
-(function restoreTimer(){
-  const e=parseInt(localStorage.getItem(TKEY),10);
-  if(e&&e>Date.now()&&e-Date.now()<=REST_PRESETS[REST_PRESETS.length-1]*1000){
-    tm={end:e}; notified=false;
-    clearTimeout(endTimer);
-    endTimer=setTimeout(onRestEnd,e-Date.now());
-  }
-})();
-setInterval(tickTimer,500);
-document.addEventListener('visibilitychange',()=>{ if(!document.hidden) tickTimer(); });
-tickTimer();
 
 /* ── 匯出文字 ── */
 function exportLines(date,sets){

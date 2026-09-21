@@ -1,5 +1,5 @@
 /* 訓練記錄 service worker:離線快取 + 組間休息通知 */
-const CACHE='trainlog-v6';
+const CACHE='trainlog-v7';
 const ASSETS=['./','./index.html','./icon-180.png','./icon-512.png','./manifest.json'];
 
 self.addEventListener('install',e=>{
@@ -22,13 +22,4 @@ self.addEventListener('fetch',e=>{
       return r;
     }).catch(()=>caches.match(e.request).then(r=>r||caches.match('./index.html')))
   );
-});
-
-/* 點通知 → 回到 App */
-self.addEventListener('notificationclick',e=>{
-  e.notification.close();
-  e.waitUntil(self.clients.matchAll({type:'window',includeUncontrolled:true}).then(cs=>{
-    for(const c of cs) if('focus' in c) return c.focus();
-    if(self.clients.openWindow) return self.clients.openWindow('./');
-  }));
 });
